@@ -1,0 +1,136 @@
+<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>丈夫な構造をつくろう</title>
+<style>
+:root{--bg:#f4f6f8;--fg:#1d2733;--card:#fff;--line:#c9d1da;--acc:#2f6fed;--ok:#1a8a4a;--ng:#c43c3c;--bar:#4d5966;--dot:#b8c1cc;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#13181e;--fg:#e6ebf0;--card:#1c232b;--line:#34404c;--acc:#6f9bff;--ok:#4cc27f;--ng:#ff7a7a;--bar:#aeb9c5;--dot:#3a4652}}
+:root[data-theme="dark"]{--bg:#13181e;--fg:#e6ebf0;--card:#1c232b;--line:#34404c;--acc:#6f9bff;--ok:#4cc27f;--ng:#ff7a7a;--bar:#aeb9c5;--dot:#3a4652}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;padding:12px;line-height:1.6}
+main{max-width:860px;margin:0 auto}
+h1{font-size:20px;margin:0 0 8px}
+.tabs,.row{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+button,select{font:inherit;padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--fg);min-height:44px}
+button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+button.go{background:var(--ok);color:#fff;border-color:var(--ok);font-weight:bold}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:8px 0}
+canvas{width:100%;height:auto;background:var(--card);border:1px solid var(--line);border-radius:12px;touch-action:none;display:block}
+#res{font-weight:bold;font-size:22px}.ok{color:var(--ok)}.ng{color:var(--ng)}
+.lg span{display:inline-block;width:22px;height:8px;border-radius:4px;vertical-align:middle;margin:0 4px 0 10px}
+</style></head><body><main>
+<h1>🌉 丈夫な構造をつくろう</h1>
+<div class="tabs" id="tabs"></div>
+<div class="card"><b id="st"></b><div id="desc"></div></div>
+<div id="guide" class="card" style="border-color:var(--acc);font-weight:bold"></div>
+<canvas id="cv" width="800" height="480"></canvas>
+<div class="lg card">棒の色:<span style="background:#e04a4a"></span>押されている(圧縮)<span style="background:#3a7bf0"></span>引っ張られている(引張)　<span style="background:var(--bar)"></span>力は小さい　<b id="cnt" style="float:right"></b></div>
+<div class="row">
+<button id="mD" class="on">✏️ つくる</button><button id="mE">🧽 消しゴム</button><button id="bU">↶ 1本もどす</button>
+<button class="go" id="bT">▶ テスト</button><button id="bR">↺ やりなおす</button><button id="bH">💡 ヒント</button><button id="bG">🏳 ギブアップ</button>
+</div>
+<div id="hint" class="card" style="display:none;border-color:var(--acc)"></div>
+<div class="card" id="resc" style="display:none"><div id="res"></div><div id="exp"></div><div id="pc"></div><div id="score" class="ok" style="display:none;margin:8px 0;font-weight:bold"></div><div class="row"><button id="bF">✏️ 直してもう一度</button><button id="bN" class="go" style="display:none"></button></div></div>
+<div class="card" style="font-size:14px">灰色の四角(固定)は動かない点、オレンジ(荷重)はおもり。棒でつないで、おもりを落とさないようにしよう。進め方:棒をつなぐ → 「テスト」を押す → 結果を見て作りなおす。</div>
+<footer style="text-align:center;font-size:13px;opacity:.7;margin:16px 0 8px">© Irie Kanji</footer>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<script>
+const {Engine,Body,Bodies,Composite,Constraint}=Matter;
+const G=40,W=800,H=480;
+const S=[
+{t:'ステージ1:四角形は丈夫?',min:4,sol:{p:[],b:[[0,3],[3,2],[2,1],[0,2]]},a:[[4,4],[4,8]],l:[8,8,5],mb:8,ml:9999,pre:[[8,4]],pb:[[0,3],[3,2],[2,1],[0,1]],
+d:'かべ(固定の点)から四角形の枠がつき出ているよ。まず「テスト」を押して、どうなるか見てみよう。つぶれたら、棒を1本足して直してみよう。棒は8本まで。',
+hv:[{t:'四角形は押されると形が変わってしまう。形が変わらない図形は何だったかな?'},{t:'三角形をつくるために、四角形の対角線(ななめ)に1本足してみよう。',hl:[[0,2]]}],
+ok:'せいこう!ななめの棒で「三角形」ができると形が変わらなくなるよ。四角形は押されると平行四辺形につぶれるけど、三角形は3本の長さだけで形が決まるんだ。',
+ng:'つぶれた…四角形は押されると形が変わってしまう。どこに棒を足すと三角形になるかな?'},
+{t:'ステージ2:塔をつくろう(Aの形)',min:6,sol:{p:[[7,7],[9,7]],b:[[0,3],[3,2],[1,4],[4,2],[3,4],[3,1]]},a:[[6,10],[10,10]],l:[8,4,5],mb:10,ml:5*G,
+d:'地面の固定点2つの上で、高い所のおもりをささえる塔をつくろう。棒は1本5マスまで。長い棒は使えないので、途中に関節(点)を作ろう。棒は10本まで。',
+hv:[{t:'おもりまでは遠くて、1本の棒ではとどかない。左右の足の途中に点(関節)を置いて、足を2本の棒ずつに分けよう。'},
+{t:'まず「Aの形」。丸①②に点を置き、点線のとおり左右の足をつなごう。(丸=点を置く場所、点線=つなぐ棒)',hp:[[7,7],[9,7]],hg:[[6,10,7,7],[7,7,8,4],[10,10,9,7],[9,7,8,4]]},
+{t:'Aの形には「横棒」がある。①と②をつなごう。でも、まだ形が変わる…三角形が足りないところはどこかな?',hg:[[7,7,9,7]]},
+{t:'四角形になっているところに、ななめの棒を1本足そう。①と右の固定点をつなぐと、三角形で固まるよ。',hg:[[7,7,10,10]]}],
+ok:'せいこう!長い足は途中で関節をつくって2本に分け、Aの形に横棒を入れた。でもそれだけだと横にぐらつくので、ななめの棒(ブレース)で三角形にして固めたんだ。',
+ng:'たおれた…長い足は途中に関節をつくって、Aの形にしよう。横棒を入れたあとは、ななめの棒で三角形に固めてみよう。'},
+{t:'ステージ3:遠くのおもりをささえよう',min:10,sol:{p:[[4,6],[5,5],[8,6],[9,5]],b:[[0,3],[1,3],[0,4],[3,4],[3,5],[4,5],[4,6],[5,6],[5,2],[6,2]]},a:[[2,3],[2,9]],l:[12,6,5],mb:14,ml:4*G,
+d:'おもりは遠くにある。ただし棒は1本4マスまで。途中に点を足して、三角形をつなげた形をつくろう。棒は14本まで。',
+hv:[{t:'考え方:三角形は形が変わらない。だから、三角形を1つ作り、そのとなりにまた三角形をつなげて、おもりまでのばしていこう。(次のヒントで、オレンジの丸=点を置く場所、点線=つなぐ棒 を出すよ)'},
+{t:'【三角形①】オレンジの丸①に点を置き(空いた場所をタップ)、点線のとおり、壁の上の点と下の点の両方につなごう。壁と①で三角形ができるよ。',hp:[[4,6]],hg:[[2,3,4,6],[2,9,4,6]]},
+{t:'【三角形②】丸②に点を置き、点線のとおり「壁の上の点」と「①」につなごう。',hp:[[5,5]],hg:[[2,3,5,5],[4,6,5,5]]},
+{t:'【三角形③】丸③に点を置き、点線のとおり「①」と「②」につなごう。このあとは、同じように三角形をつなげて、おもりまでのばしていこう。',hp:[[8,6]],hg:[[4,6,8,6],[5,5,8,6]]}],
+ok:'せいこう!三角形をつなげた「トラス構造」。力がたくさんの棒に分かれて伝わる(力の分散)から、遠くまでささえられるんだ。',
+ng:'たえられなかった…棒がたりないか、四角形が残っていないかな?三角形をならべてみよう。'}];
+let hintOn=false,sel=null,si=0,pts,bars,mode='D',sim=null,drag=null,mouse=null,frame=0,li=0,best={},gu={},gave=false,gaveArm=0;
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),$=id=>document.getElementById(id);
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function loadStage(i){si=i;const s=S[i];pts=s.a.map(a=>({x:a[0]*G,y:a[1]*G,f:1}));pts.push({x:s.l[0]*G,y:s.l[1]*G,f:1,L:s.l[2]});li=pts.length-1;(s.pre||[]).forEach(a=>pts.push({x:a[0]*G,y:a[1]*G}));bars=(s.pb||[]).map(b=>b.slice());sel=null;gave=false;sim=null;drag=null;
+$('st').textContent=s.t;$('desc').textContent=s.d;$('hint').style.display='none';hintOn=false;$('resc').style.display='none';
+[...$('tabs').children].forEach((b,k)=>b.classList.toggle('on',k==i));upd()}
+S.forEach((s,i)=>{const b=document.createElement('button');b.textContent='ステージ'+(i+1);b.onclick=()=>loadStage(i);$('tabs').appendChild(b)});
+function upd(){$('cnt').textContent='棒 '+bars.length+' / '+S[si].mb}
+function pos(e){const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height}}
+const snap=p=>({x:Math.max(G,Math.min(W-G,Math.round(p.x/G)*G)),y:Math.max(G,Math.min(H-G,Math.round(p.y/G)*G))});
+const near=(p,r=20)=>{let b=-1,d=r;pts.forEach((q,i)=>{const e=Math.hypot(q.x-p.x,q.y-p.y);if(e<d){d=e;b=i}});return b};
+function addPt(p){const q=snap(p);let i=near(q,5);if(i>=0)return i;if(pts.length>=20)return -1;pts.push({x:q.x,y:q.y});return pts.length-1}
+function addBar(i,j){if(i<0||j<0||i==j||bars.length>=S[si].mb)return;if(bars.some(b=>(b[0]==i&&b[1]==j)||(b[0]==j&&b[1]==i)))return;
+if(Math.hypot(pts[i].x-pts[j].x,pts[i].y-pts[j].y)>S[si].ml+1){$('guide').textContent='⚠ 棒が長すぎるよ(1本は'+S[si].ml/G+'マスまで)。途中に点を置こう。';gt='x';setTimeout(()=>gt='',2500);return}bars.push([i,j]);upd()}
+function segD(p,a,b){const dx=b.x-a.x,dy=b.y-a.y;let t=((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy);t=Math.max(0,Math.min(1,t));return Math.hypot(p.x-a.x-t*dx,p.y-a.y-t*dy)}
+cv.addEventListener('pointerdown',e=>{if(sim)return;const p=pos(e);mouse=p;cv.setPointerCapture(e.pointerId);
+if(mode=='E'){const i=near(p,16);if(i>=0&&!pts[i].f){pts.splice(i,1);bars=bars.filter(b=>b[0]!=i&&b[1]!=i).map(b=>b.map(k=>k>i?k-1:k));li=pts.findIndex(q=>q.L);upd();return}
+const k=bars.findIndex(b=>segD(p,pts[b[0]],pts[b[1]])<12);if(k>=0){bars.splice(k,1);upd()}return}
+const i=near(p);drag=i>=0?i:'new';if(drag=='new'){drag={x:snap(p).x,y:snap(p).y}}});
+cv.addEventListener('pointermove',e=>{mouse=pos(e)});
+cv.addEventListener('pointerup',e=>{if(sim||drag==null||mode=='E'){drag=null;return}const p=pos(e);let a=drag;drag=null;
+const moved=typeof a=='number'?Math.hypot(pts[a].x-p.x,pts[a].y-p.y)>20:Math.hypot(a.x-p.x,a.y-p.y)>20;
+if(!moved){if(typeof a=='number'){if(sel==null)sel=a;else{if(sel!=a)addBar(sel,a);sel=null}}else{const n=addPt(a);if(sel!=null){addBar(sel,n);sel=null}}upd();return}
+if(typeof a!='number')a=addPt(a);sel=null;let j=near(p);if(j<0)j=addPt(p);addBar(a,j)});
+$('mD').onclick=()=>{mode='D';$('mD').classList.add('on');$('mE').classList.remove('on')};
+$('mE').onclick=()=>{mode='E';$('mE').classList.add('on');$('mD').classList.remove('on')};
+$('bU').onclick=()=>{if(!sim&&bars.length){bars.pop();sel=null;upd()}};
+$('bG').onclick=()=>{if(sim)return;if(!gaveArm){gaveArm=1;$('bG').textContent='⚠ もう一度おすとギブアップ';setTimeout(()=>{gaveArm=0;$('bG').textContent='🏳 ギブアップ'},3000);return}
+gaveArm=0;$('bG').textContent='🏳 ギブアップ';loadStage(si);const sl=S[si].sol;sl.p.forEach(a=>pts.push({x:a[0]*G,y:a[1]*G}));bars=sl.b.map(b=>b.slice());gave=true;upd();$('bT').onclick()};
+$('bH').onclick=()=>{const n=S[si].hv.length;hintOn=Math.min(n,hintOn+1);$('hint').textContent='💡 ヒント'+hintOn+'/'+n+':'+S[si].hv[hintOn-1].t+(hintOn<n?'(もっと知りたいときは、もう一度ヒントを押そう)':'');$('hint').style.display='block';$('hint').scrollIntoView({behavior:'smooth',block:'nearest'})};
+$('bR').onclick=()=>loadStage(si);
+$('bF').onclick=()=>{gave=false;sim=null;sel=null;$('resc').style.display='none'};
+$('bT').onclick=()=>{if(sim)return;$('desc').textContent=S[si].d;
+const eng=Engine.create({constraintIterations:14,positionIterations:14,velocityIterations:10});
+const bs=pts.map(p=>{const b=Bodies.circle(p.x,p.y,p.L?11:6,{isStatic:!!(p.f&&!p.L),collisionFilter:{group:-1},frictionAir:.03});if(!b.isStatic)Body.setMass(b,p.L||1);return b});
+const cs=bars.map(([i,j])=>{const c=Constraint.create({bodyA:bs[i],bodyB:bs[j],stiffness:.8,damping:.1});return{c,i,j,rest:c.length,br:0,s:0}});
+Composite.add(eng.world,[...bs,...cs.map(x=>x.c)]);sim={eng,bs,cs,y0:bs[li].position.y,x0:bs[li].position.x};frame=0;$('resc').style.display='none'};
+function diag(){const comp=new Set([li]);let ch=true;while(ch){ch=false;bars.forEach(([a,b])=>{if(comp.has(a)!=comp.has(b)){comp.add(a);comp.add(b);ch=true}})}
+if(comp.size<2)return'おもりに棒がつながっていないよ。おもりに棒をつなごう。';
+const fx=[...comp].filter(i=>pts[i].f&&!pts[i].L).length,fr=[...comp].filter(i=>!pts[i].f||pts[i].L).length;
+if(fx==0)return'おもりが固定点(灰色)につながっていないよ。';
+if(fx==1)return'固定点が1つしかつながっていないよ。もう1つの固定点にも棒をつなごう。';
+for(const i of comp){if(pts[i].f||S[si].nc)continue;const nb=bars.filter(b=>b[0]==i||b[1]==i).map(b=>pts[b[0]==i?b[1]:b[0]]);if(nb.length==2&&Math.abs((nb[0].x-pts[i].x)*(nb[1].y-pts[i].y)-(nb[0].y-pts[i].y)*(nb[1].x-pts[i].x))<1)return'一直線にならんだ棒は、押されると曲がってしまうよ。まっすぐにせず、三角形をつくろう。'}
+const m=bars.filter(([a,b])=>comp.has(a)&&!(pts[a].f&&!pts[a].L&&pts[b].f&&!pts[b].L)).length;
+if(m<2*fr)return'まだ三角形になっていない部分があって、形が変わってしまうよ(四角形や、つながりの足りない所はないかな?)。';
+return'棒がたりないか、長い棒に力が集まりすぎたのかも。三角形をふやしてみよう。'}
+function finish(){const sag=sim.bs[li].position.y-sim.y0,broke=sim.cs.some(x=>x.br),dx=sim.bs[li].position.x-sim.x0,pass=sag<40&&Math.abs(dx)<30&&!broke,s=S[si];
+$('resc').style.display='block';$('res').className=pass?'ok':'ng';$('res').textContent=gave?'🏳 ギブアップ(答えの形を見てみよう)':pass?'✅ せいこう!':(broke?'💥 棒がこわれた!':sag<40?'↔ おもりが横にゆれた!':'⬇ おもりが下がった!');
+$('exp').textContent=pass?s.ok:'🔍 '+diag()+'\n'+s.ng;$('exp').style.whiteSpace='pre-line';$('pc').textContent='';
+if(gave){gu[si]=1;$('pc').textContent='これが答えの形だよ。どこが三角形になっているか、見つけてみよう。'}else if(pass){const n=bars.length;if(!best[si]||n<best[si])best[si]=n;$('pc').textContent+='使った棒:'+n+'本(最少記録:'+best[si]+'本)。もっと少ない本数でもできるかな?'}
+const nb=$('bN');nb.style.display=pass?'inline-block':'none';
+if(pass){const last=si>=S.length-1;nb.textContent=last?'🎉 全ステージクリア!(最初にもどる)':'次のステージへ ▶';nb.onclick=()=>loadStage(last?0:si+1)}
+const sc=$('score'),all=S.every((_,i)=>best[i]||gu[i]);
+if(pass&&all&&S.some((_,i)=>best[i])){const MIN=S.reduce((a,x,i)=>a+(best[i]?x.min:0),0),tot=S.reduce((a,_,i)=>a+(best[i]||0),0),pt=tot<=MIN?100:Math.floor(100*MIN/tot);const rk=pt>=100?'技術の神':pt>=80?'技術の匠':pt>=50?'修行中':'凡人';sc.style.display='block';sc.innerHTML='🏆 スコア <span style="font-size:32px">'+pt+'</span>点　「'+rk+'」<br><small>ベスト本数 '+S.map((_,i)=>'ステージ'+(i+1)+':'+(best[i]?best[i]+'本':'ギブアップ(対象外)')).join('・')+'（合計'+tot+'本）。合計'+MIN+'本なら100点！　少ない本数で再挑戦するとスコアが更新されるよ。</small>'}
+else if(pass&&all){sc.style.display='block';sc.innerHTML='<small>ギブアップしたステージはスコアに入らないよ。自力でクリアすると、スコアが出るよ。</small>'}
+else if(pass){sc.style.display='block';sc.innerHTML='<small>すべてのステージをクリアすると、スコアが出るよ。</small>'}else sc.style.display='none';
+$('resc').style.borderColor=pass?'var(--ok)':'var(--ng)';$('resc').scrollIntoView({behavior:'smooth',block:'nearest'})}
+function line(a,b,c,w){ctx.strokeStyle=c;ctx.lineWidth=w;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
+function dot(p,r,c){ctx.fillStyle=c;ctx.beginPath();ctx.arc(p.x,p.y,r,0,7);ctx.fill()}
+function draw(){ctx.clearRect(0,0,W,H);ctx.fillStyle=css('--dot');for(let x=G;x<W;x+=G)for(let y=G;y<H;y+=G){ctx.fillRect(x-1.5,y-1.5,3,3)}
+const fg=css('--fg'),bar=css('--bar'),card=css('--card');
+if(!sim){bars.forEach(b=>line(pts[b[0]],pts[b[1]],bar,6));
+let hc=0;if(hintOn)S[si].hv.slice(0,hintOn).forEach(v=>{ctx.setLineDash([10,8]);(v.hl||[]).forEach(h=>line(pts[h[0]],pts[h[1]],'#f08a24',4));(v.hg||[]).forEach(h=>line({x:h[0]*G,y:h[1]*G},{x:h[2]*G,y:h[3]*G},'#f08a24',4));ctx.setLineDash([]);(v.hp||[]).forEach(q=>{ctx.strokeStyle='#f08a24';ctx.lineWidth=3;ctx.beginPath();ctx.arc(q[0]*G,q[1]*G,13,0,7);ctx.stroke();ctx.fillStyle='#f08a24';ctx.font='bold 15px sans-serif';ctx.textAlign='center';ctx.fillText(++hc,q[0]*G,q[1]*G-19)})});
+if(drag!=null&&mouse){const a=typeof drag=='number'?pts[drag]:drag;line(a,snap(mouse),'#2f6fed88',4)}
+pts.forEach(p=>{if(p.L){dot(p,12,'#f08a24');ctx.fillStyle='#fff';ctx.font='bold 11px sans-serif';ctx.textAlign='center';ctx.fillText('荷重',p.x,p.y+4)}else if(p.f){ctx.fillStyle='#8a94a0';ctx.fillRect(p.x-9,p.y-9,18,18)}else{dot(p,7,card);ctx.strokeStyle=fg;ctx.lineWidth=2;ctx.beginPath();ctx.arc(p.x,p.y,7,0,7);ctx.stroke()}})}
+else{for(let k=0;k<2;k++)Engine.update(sim.eng,1000/120);
+sim.cs.forEach(x=>{if(x.br)return;const A=sim.bs[x.i].position,B=sim.bs[x.j].position;x.s=(Math.hypot(A.x-B.x,A.y-B.y)-x.rest)/x.rest;if(Math.abs(x.s)>.12){x.br=1;Composite.remove(sim.eng.world,x.c)}});
+sim.cs.forEach(x=>{if(x.br)return;const A=sim.bs[x.i].position,B=sim.bs[x.j].position,t=Math.min(1,Math.abs(x.s)/.03);
+const col=t<.08?bar:(x.s<0?'rgba(224,74,74,'+(.4+.6*t)+')':'rgba(58,123,240,'+(.4+.6*t)+')');line(A,B,col,6+4*t)});
+sim.bs.forEach((b,i)=>{const p=b.position;if(pts[i].L){dot(p,12,'#f08a24')}else if(pts[i].f){ctx.fillStyle='#8a94a0';ctx.fillRect(p.x-9,p.y-9,18,18)}else dot(p,5,fg)});
+frame++;if(frame==300)finish()}
+if(!sim&&sel!=null){ctx.strokeStyle='#2f6fed';ctx.lineWidth=3;ctx.beginPath();ctx.arc(pts[sel].x,pts[sel].y,17,0,7);ctx.stroke()}
+pts.forEach(p=>{if(p.f&&!p.L){ctx.fillStyle=css('--fg');ctx.font='12px sans-serif';ctx.textAlign='center';ctx.fillText('固定',p.x,p.y+24)}});
+guide();requestAnimationFrame(draw)}
+let gt='';function guide(){const t=sim?(frame<300?'テスト中… 色を見よう(赤=押される・青=引っ張られる)':'結果が出たよ。「↺ やりなおす」(最初から)か「✏️ 直してもう一度」(今の形を直す)を押そう'):sel!=null?'👉 つなぎたい「次の点」をタップ(空いた場所なら新しい点ができる)':'① 点をタップ → ② つなぎたい点をタップ で棒がつながる(ドラッグでもOK)';if(t!=gt){gt=t;$('guide').textContent=t}}
+loadStage(0);draw();
+</script></body></html>
