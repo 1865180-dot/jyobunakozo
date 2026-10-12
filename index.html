@@ -15,13 +15,24 @@ button.go{background:var(--ok);color:#fff;border-color:var(--ok);font-weight:bol
 canvas{width:100%;height:auto;background:var(--card);border:1px solid var(--line);border-radius:12px;touch-action:none;display:block}
 #res{font-weight:bold;font-size:22px}.ok{color:var(--ok)}.ng{color:var(--ng)}
 .lg span{display:inline-block;width:22px;height:8px;border-radius:4px;vertical-align:middle;margin:0 4px 0 10px}
+@media (min-width:900px){
+main{max-width:none;display:grid;grid-template-columns:minmax(0,min(calc((100vh - 190px)*5/3),64vw)) minmax(320px,1fr);gap:0 14px;align-items:start}
+.top{grid-column:1/-1;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.top h1{margin:0;font-size:18px}.top .tabs{margin:0}
+.left .card,.right .card{margin:6px 0}
+.right{max-height:calc(100vh - 70px);overflow-y:auto;padding-right:4px}
+.right .row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+body{padding:8px 12px}
+}
 </style></head><body><main>
-<h1>🌉 丈夫な構造をつくろう</h1>
-<div class="tabs" id="tabs"></div>
-<div class="card"><b id="st"></b><div id="desc"></div></div>
+<header class="top"><h1>🌉 丈夫な構造をつくろう</h1><div class="tabs" id="tabs"></div></header>
+<section class="left">
 <div id="guide" class="card" style="border-color:var(--acc);font-weight:bold"></div>
 <canvas id="cv" width="800" height="480"></canvas>
 <div class="lg card">棒の色:<span style="background:#e04a4a"></span>押されている(圧縮)<span style="background:#3a7bf0"></span>引っ張られている(引張)　<span style="background:var(--bar)"></span>力は小さい　<b id="cnt" style="float:right"></b></div>
+</section>
+<aside class="right">
+<div class="card"><b id="st"></b><div id="desc"></div></div>
 <div class="row">
 <button id="mD" class="on">✏️ つくる</button><button id="mE">🧽 消しゴム</button><button id="bU">↶ 1本もどす</button>
 <button class="go" id="bT">▶ テスト</button><button id="bR">↺ やりなおす</button><button id="bH">💡 ヒント</button><button id="bG">🏳 ギブアップ</button>
@@ -30,6 +41,7 @@ canvas{width:100%;height:auto;background:var(--card);border:1px solid var(--line
 <div class="card" id="resc" style="display:none"><div id="res"></div><div id="exp"></div><div id="pc"></div><div id="score" class="ok" style="display:none;margin:8px 0;font-weight:bold"></div><div class="row"><button id="bF">✏️ 直してもう一度</button><button id="bN" class="go" style="display:none"></button></div></div>
 <div class="card" style="font-size:14px">灰色の四角(固定)は動かない点、オレンジ(荷重)はおもり。棒でつないで、おもりを落とさないようにしよう。進め方:棒をつなぐ → 「テスト」を押す → 結果を見て作りなおす。</div>
 <footer style="text-align:center;font-size:13px;opacity:.7;margin:16px 0 8px">© Irie Kanji</footer>
+</aside>
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
 <script>
